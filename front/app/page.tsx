@@ -29,7 +29,7 @@ export default function Home() {
     try {
       setLoading(true);
 
-      const response = await fetch("http://127.0.0.1:8000/processar/", {
+      const response = await fetch("https://servicos-relatorio-pagamentos-api.eu8tjo.easypanel.host/processar/", {
         method: "POST",
         body: formData,
       });
