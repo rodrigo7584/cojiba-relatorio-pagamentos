@@ -12,6 +12,7 @@ import uuid
 import pandas as pd
 import tempfile
 import shutil
+import chardet #nova
 
 app = FastAPI()
 app.add_middleware(
@@ -75,8 +76,15 @@ def processar_arquivos(holerites, cartoes):
   # Leitura dos holerites
   # -------------------------------
   for arquivo_nome in holerites:
-      with open(arquivo_nome, encoding="ANSI") as arquivo:
-          linhas.extend(arquivo.readlines())
+    print(f"\n=== LENDO ARQUIVO ===")
+    print(f"Arquivo: {arquivo_nome}")
+    with open(arquivo_nome, 'rb') as f:
+        raw = f.read()
+        enc = chardet.detect(raw)['encoding']
+
+  linhas = raw.decode(enc).splitlines()  
+    #   with open(arquivo_nome, encoding="ANSI") as arquivo:
+    #       linhas.extend(arquivo.readlines())
 
   # -------------------------------
   # Processamento dos blocos
