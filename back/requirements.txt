@@ -5,3 +5,4 @@ oracledb
 python-multipart
 openpyxl
 xlrd>=2.0.1
+chardet
