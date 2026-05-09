@@ -29,7 +29,8 @@ export default function Home() {
     try {
       setLoading(true);
 
-      const response = await fetch("https://servicos-relatorio-pagamentos-api.eu8tjo.easypanel.host/processar/", {
+      // const response = await fetch("https://servicos-relatorio-pagamentos-api.eu8tjo.easypanel.host/processar/", {
+      const response = await fetch("http://192.168.0.123:8000/processar/", {
         method: "POST",
         body: formData,
       });

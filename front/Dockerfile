@@ -7,7 +7,8 @@ WORKDIR /app
 COPY package.json package-lock.json* ./
 
 # Instalar dependências
-RUN npm install --frozen-lockfile
+# RUN npm install --frozen-lockfile
+RUN npm ci
 
 # Copiar código da aplicação
 COPY . .
