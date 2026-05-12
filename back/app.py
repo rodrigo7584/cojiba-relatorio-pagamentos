@@ -55,17 +55,18 @@ def processar_arquivos(holerites, cartoes):
   # Leitura dos cartões
   # -------------------------------
   for arquivo in cartoes:
-      df_temp = pd.read_excel(
-          arquivo,
-          skiprows=2,
-          skipfooter=1,
-          header=None,
-          usecols=[0,1,2],
-          names=["NOME", "SIGA", "COMISSAO"]
-      )
+ 
+    df_temp = pd.read_excel(
+        arquivo,
+        skiprows=2,
+        skipfooter=1,
+        header=None,
+        usecols=[0,1,2],
+        names=["NOME", "SIGA", "COMISSAO"]
+    )
 
-      df_temp.columns = df_temp.columns.str.strip().str.upper()
-      dfs.append(df_temp)
+    df_temp.columns = df_temp.columns.str.strip().str.upper()
+    dfs.append(df_temp)
 
   df_cartoes = pd.concat(dfs, ignore_index=True)
 
@@ -76,20 +77,17 @@ def processar_arquivos(holerites, cartoes):
   # Leitura dos holerites
   # -------------------------------
   for arquivo_nome in holerites:
-    print(f"\n=== LENDO ARQUIVO ===")
-    print(f"Arquivo: {arquivo_nome}")
+ 
     with open(arquivo_nome, 'rb') as f:
         raw = f.read()
         enc = chardet.detect(raw)['encoding']
 
-  linhas = raw.decode(enc).splitlines()  
-    #   with open(arquivo_nome, encoding="ANSI") as arquivo:
-    #       linhas.extend(arquivo.readlines())
+    linhas = raw.decode(enc).splitlines()  
 
-  # -------------------------------
-  # Processamento dos blocos
-  # -------------------------------
-  for i in range(0, len(linhas), tamanho_bloco):
+    # -------------------------------
+    # Processamento dos blocos
+    # -------------------------------
+    for i in range(0, len(linhas), tamanho_bloco):
       bloco = linhas[i:i + tamanho_bloco]
 
       if len(bloco) > 1:
@@ -98,13 +96,13 @@ def processar_arquivos(holerites, cartoes):
           linha1 = bloco[0].strip()
           partesLinha1 = linha1.split(",")
           empresa = ""
-
           for j, parte in enumerate(partesLinha1):
-              if "Recibo de Pagamento - Salário" in parte:
-                  if j > 0:
-                      empresa = partesLinha1[j-1].strip()
-                  break
-          
+            
+            if "Recibo de Pagamento - Salário" in parte:
+                if j > 0:
+                    empresa = partesLinha1[j-1].strip()
+                break
+            
           # Nome e cargo
           linha3 = bloco[3].strip()
           partesLinha3 = linha3.split(",")
@@ -124,7 +122,7 @@ def processar_arquivos(holerites, cartoes):
           linha30 = bloco[30].strip()
           partesLinha30 = linha30.split('"')
           pagamento = locale.atof(partesLinha30[1].strip())
-
+            
           registro = {
               "Empresa": empresa,
               "Nome": nome,
@@ -174,6 +172,7 @@ def processar_arquivos(holerites, cartoes):
   }) 
 
   return df_saida, df_sem
+
 @app.post("/processar/")
 async def processar(
     background_tasks: BackgroundTasks,
@@ -217,7 +216,7 @@ async def processar(
                 grupo.drop(columns=["Nome_norm"], errors="ignore").to_excel(
                     writer, sheet_name=nome_sheet, index=False
                 )
-
+            
             df_sem.to_excel(writer, sheet_name="SEM REGISTRO", index=False)
 
         # agenda limpeza
