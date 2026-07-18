@@ -20,22 +20,6 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-def ler_arquivo_com_encoding(arquivo_nome):
-    with open(arquivo_nome, 'rb') as f:
-        raw = f.read()
-        enc = chardet.detect(raw)['encoding']
-
-    try:
-        # tenta UTF-8 primeiro
-        return raw.decode('utf-8').splitlines()
-    except UnicodeDecodeError:
-        try:
-            # tenta Latin1/CP1252
-            return raw.decode('latin1').splitlines()
-        except Exception:
-            # fallback para encoding detectado pelo chardet
-            return raw.decode(enc, errors='ignore').splitlines()
-
 # -------------------------------
 # Função para deletar arquivos
 # -------------------------------
@@ -60,6 +44,7 @@ def processar_arquivos(holerites, cartoes):
     # Função para normalizar nomes
     # -------------------------------
     def normalizar(texto):
+        print(f"Normalizando: {texto}")  # Debug
         texto = str(texto).strip().upper()
         return ''.join(
             c for c in unicodedata.normalize('NFD', texto)
@@ -88,10 +73,11 @@ def processar_arquivos(holerites, cartoes):
     # -------------------------------
     # Leitura dos holerites
     # -------------------------------
-    linhas = []
     for arquivo_nome in holerites:
-        linhas.extend(ler_arquivo_com_encoding(arquivo_nome))
-
+        with open(arquivo_nome, 'rb') as f:
+            raw = f.read()
+            enc = chardet.detect(raw)['encoding']
+        linhas = raw.decode(enc).splitlines()
 
     # -------------------------------
     # Processamento dos blocos
@@ -160,6 +146,7 @@ def processar_bloco(bloco, normalizar):
 
         # Empresa
         for l in bloco:
+            print(f"Verificando linha para empresa: {l}")  # Debug
             if "Recibo de Pagamento" in l:
                 partes = l.split(",")
                 idx = partes.index("Recibo de Pagamento - Salário") if "Recibo de Pagamento - Salário" in partes else -1
@@ -174,7 +161,6 @@ def processar_bloco(bloco, normalizar):
                 if len(partes) >= 6:
                     nome = partes[2].strip()
                     cargo = partes[5].strip()
-                    print(f"Nome encontrado: {nome}, Cargo encontrado: {cargo}")  # Debug
                 break
 
         # Vale
@@ -225,12 +211,13 @@ async def processar(
             shutil.copyfileobj(file.file, tmp)
             tmp.close()
             arquivos_holerite.append(tmp.name)
-        
+
         for file in cartoes:
             tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".xls")
             shutil.copyfileobj(file.file, tmp)
             tmp.close()
             arquivos_cartao.append(tmp.name)
+
         # processa
         df_saida, df_sem = processar_arquivos(arquivos_holerite, arquivos_cartao)
 

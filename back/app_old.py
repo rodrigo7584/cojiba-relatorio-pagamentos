@@ -20,22 +20,6 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-def ler_arquivo_com_encoding(arquivo_nome):
-    with open(arquivo_nome, 'rb') as f:
-        raw = f.read()
-        enc = chardet.detect(raw)['encoding']
-
-    try:
-        # tenta UTF-8 primeiro
-        return raw.decode('utf-8').splitlines()
-    except UnicodeDecodeError:
-        try:
-            # tenta Latin1/CP1252
-            return raw.decode('latin1').splitlines()
-        except Exception:
-            # fallback para encoding detectado pelo chardet
-            return raw.decode(enc, errors='ignore').splitlines()
-
 # -------------------------------
 # Função para deletar arquivos
 # -------------------------------
@@ -53,7 +37,9 @@ def processar_arquivos(holerites, cartoes):
     except:
         locale.setlocale(locale.LC_ALL, 'Portuguese_Brazil.1252')
 
+    tamanho_bloco = 73
     registros = []
+    linhas = []
     dfs = []
 
     # -------------------------------
@@ -88,28 +74,63 @@ def processar_arquivos(holerites, cartoes):
     # -------------------------------
     # Leitura dos holerites
     # -------------------------------
-    linhas = []
     for arquivo_nome in holerites:
-        linhas.extend(ler_arquivo_com_encoding(arquivo_nome))
+        with open(arquivo_nome, 'rb') as f:
+            raw = f.read()
+            enc = chardet.detect(raw)['encoding']
 
+        linhas = raw.decode(enc).splitlines()
 
     # -------------------------------
     # Processamento dos blocos
     # -------------------------------
-    bloco = []
-    contador_recebi = 0
+    for i in range(0, len(linhas), tamanho_bloco):
+        bloco = linhas[i:i + tamanho_bloco]
+        
+        if len(bloco) > 1:
+            # Empresa
+            linha1 = bloco[0].strip()
+            partesLinha1 = linha1.split(",")
+            empresa = ""
+            for j, parte in enumerate(partesLinha1):
+                if "Recibo de Pagamento" in parte:
+                    if j > 0:
+                        empresa = partesLinha1[j - 1].strip()
+                    break
 
-    for linha in linhas:
-        bloco.append(linha)
-        if "Recebi a importância líquida discriminada acima." in linha:
-            contador_recebi += 1
-            if contador_recebi == 2:
-                # processa o bloco completo
-                registro = processar_bloco(bloco, normalizar)
-                if registro:
-                    registros.append(registro)
-                bloco = []
-                contador_recebi = 0
+            # Nome e cargo
+            linha3 = bloco[3].strip()
+            partesLinha3 = linha3.split(",")
+            nome = partesLinha3[2]
+            cargo = partesLinha3[5]
+
+            # Vale
+            vale = 0
+            for linha in bloco:
+                if "Desc.Adto Salarial" in linha:
+                    match = re.search(r'Desc\.Adto Salarial.*?"\s*([\d.,]+)\s*"', linha)
+                    if match:
+                        vale = locale.atof(match.group(1))
+                    break
+
+            # Pagamento
+            linha30 = bloco[30].strip()
+            partesLinha30 = linha30.split('"')
+            #print (f"Pagamento: {partesLinha30}")
+            pagamento = locale.atof(partesLinha30[1].strip())
+            
+
+            registro = {
+                "Empresa": empresa,
+                "Nome": nome,
+                "Nome_norm": normalizar(nome),
+                "Cargo": cargo,
+                "Vale": vale,
+                "Pagamento": pagamento,
+                "Salário": round(pagamento + vale, 2)
+            }
+            registros.append(registro)
+            #print(registro)
 
     # -------------------------------
     # Cruzamento com df_cartoes
@@ -151,61 +172,6 @@ def processar_arquivos(holerites, cartoes):
 
     return df_saida, df_sem
 
-# -------------------------------
-# Função auxiliar para processar um bloco
-# -------------------------------
-def processar_bloco(bloco, normalizar):
-    try:
-        empresa, nome, cargo, vale, pagamento = "", "", "", 0, 0
-
-        # Empresa
-        for l in bloco:
-            if "Recibo de Pagamento" in l:
-                partes = l.split(",")
-                idx = partes.index("Recibo de Pagamento - Salário") if "Recibo de Pagamento - Salário" in partes else -1
-                if idx > 0:
-                    empresa = partes[idx-1].strip()
-                break
-
-        # Nome e cargo
-        for l in bloco:
-            if "Funcionário" in l or "CBO" in l:
-                partes = l.split(",")
-                if len(partes) >= 6:
-                    nome = partes[2].strip()
-                    cargo = partes[5].strip()
-                    print(f"Nome encontrado: {nome}, Cargo encontrado: {cargo}")  # Debug
-                break
-
-        # Vale
-        for l in bloco:
-            if "Desc.Adto Salarial" in l:
-                match = re.search(r'Desc\.Adto Salarial.*?"\s*([\d.,]+)\s*"', l)
-                if match:
-                    vale = locale.atof(match.group(1))
-                break
-
-        # Pagamento
-        for l in bloco:
-            if "Líquido R$ ->" in l:
-                partes = l.split('"')
-                if len(partes) > 1:
-                    pagamento = locale.atof(partes[1].strip())
-                break
-
-        return {
-            "Empresa": empresa,
-            "Nome": nome,
-            "Nome_norm": normalizar(nome),
-            "Cargo": cargo,
-            "Vale": vale,
-            "Pagamento": pagamento,
-            "Salário": round(pagamento + vale, 2)
-        }
-    except Exception as e:
-        print("Erro ao processar bloco:", e)
-        return None
-        
 @app.post("/processar/")
 async def processar(
     background_tasks: BackgroundTasks,
@@ -225,12 +191,13 @@ async def processar(
             shutil.copyfileobj(file.file, tmp)
             tmp.close()
             arquivos_holerite.append(tmp.name)
-        
+
         for file in cartoes:
             tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".xls")
             shutil.copyfileobj(file.file, tmp)
             tmp.close()
             arquivos_cartao.append(tmp.name)
+
         # processa
         df_saida, df_sem = processar_arquivos(arquivos_holerite, arquivos_cartao)
 
